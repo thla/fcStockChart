@@ -1,20 +1,40 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Http;
 using System.Text.RegularExpressions;
+using System.Collections.Generic;
+using System.Collections.Concurrent;
 
 namespace fcStockChart.Controllers
 {
     [Route("api/[controller]")]
     public class StockDataController : Controller
     {
-        private static string[] Summaries = new[]
+        private static ConcurrentDictionary<string, Tuple<DateTime, string[][]>> stockCache = new ConcurrentDictionary<string, Tuple<DateTime, string[][]>>();
+
+        [HttpGet("AddStock")]
+        public JsonResult AddStock([FromQuery]string stock)
         {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
+            if (!String.IsNullOrWhiteSpace(stock))
+            {
+                stock = stock.ToUpper();
+                var res = QueryStockData(stock);
+                if (res == null)
+                {
+                    return new JsonResult(new { msg = "nok" });
+                }
+                else
+                {
+                    Startup.StockData.Add(stock);
+                    return new JsonResult(new { msg = "ok" });
+                }
+            }
+
+            // If we got this far, something failed; redisplay form.
+            return new JsonResult(new { msg = "empty" });
+        }
+
 
         [HttpGet("StockList")]
         public IActionResult StockList()
@@ -26,6 +46,25 @@ namespace fcStockChart.Controllers
         [HttpGet("YahooData")]
         public IActionResult YahooData([FromQuery]string stock)
         {
+            var res = QueryStockData(stock);
+            if (res == null)
+                return NotFound(stock);
+            else
+                return Ok(res);
+        }
+
+
+        private string[][] QueryStockData(string stock)
+        {
+            if (stockCache.ContainsKey(stock))
+            {
+                if (stockCache[stock].Item1 == DateTime.Now.Date)
+                {
+                    return stockCache[stock].Item2;
+                }
+            }
+
+
             //Console.WriteLine("Please enter date information. If you leave the fields in blank, the default range is 01/01/2000 - 01/01/2014");
             DateTime startDate = DateTime.Now.AddYears(-1);
 
@@ -44,15 +83,16 @@ namespace fcStockChart.Controllers
             {
                 HttpResponseMessage response = client.GetAsync(url).Result;
                 string data = response.Content.ReadAsStringAsync().Result;
-                 
+
                 if (response.IsSuccessStatusCode)
                 {
-                    var rows = Regex.Split(data, "\r\n|\r|\n").Skip(1).Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Split(',').ToArray());                    
-                    return Ok(rows);
+                    var rows = Regex.Split(data, "\r\n|\r|\n").Skip(1).Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Split(',')).ToArray();
+                    stockCache.TryAdd(stock, Tuple.Create<DateTime, string[][]>(DateTime.Now.Date, rows));
+                    return rows;
                 }
             }
-            return NotFound(stock);
-        }
+            return null;
 
+        }
     }
 }

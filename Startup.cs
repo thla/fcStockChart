@@ -11,12 +11,17 @@ using Microsoft.Extensions.Logging;
 using System.Net.WebSockets;
 using Microsoft.AspNetCore.Http;
 using System.Threading;
+using Newtonsoft.Json;
+using System.Text;
+using System.Collections;
+using System.Collections.Concurrent;
 
 namespace fcStockChart
 {
     public class Startup
     {
-        public static List<String> StockData = new List<string>(){"AAPL","GOOG"};
+        public static HashSet<String> StockData = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "GOOG" };
+        private static ConcurrentDictionary<string, WebSocket> _sockets = new ConcurrentDictionary<string, WebSocket>();
 
         public Startup(IHostingEnvironment env)
         {
@@ -72,12 +77,22 @@ namespace fcStockChart
                     if (context.WebSockets.IsWebSocketRequest)
                     {
                         WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                        var socketId = Guid.NewGuid().ToString();
+                        _sockets.TryAdd(socketId, webSocket);
+
                         await Echo(context, webSocket);
+
+                        WebSocket dummy;
+                        _sockets.TryRemove(socketId, out dummy);
+
+                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+                        webSocket.Dispose();
                     }
                     else
                     {
                         context.Response.StatusCode = 400;
                     }
+ 
                 }
                 else
                 {
@@ -104,7 +119,23 @@ namespace fcStockChart
             WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
             while (!result.CloseStatus.HasValue)
             {
-                await webSocket.SendAsync(new ArraySegment<byte>(buffer, 0, result.Count), result.MessageType, result.EndOfMessage, CancellationToken.None);
+                var data = JsonConvert.DeserializeObject<object[]>(Encoding.UTF8.GetString(buffer, 0, result.Count));
+                if (data[0].ToString() == "add")
+                {
+                    var stocks = JsonConvert.DeserializeObject<string[]>(data[1].ToString());
+                    StockData.UnionWith(stocks);
+                }
+                var resp = System.Text.Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(StockData));
+
+                foreach (var socket in _sockets)
+                {
+                    if (socket.Value.State != WebSocketState.Open)
+                    {
+                        continue;
+                    }
+
+                    await socket.Value.SendAsync(new ArraySegment<byte>(resp, 0, resp.Length), result.MessageType, result.EndOfMessage, CancellationToken.None);
+                }
 
                 result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
             }

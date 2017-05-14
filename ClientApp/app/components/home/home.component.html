@@ -1,1 +1,27 @@
 
+<div class="container">
+    <div class="row">
+        <chart type="StockChart" [options]="options" style="height:40em"></chart>
+    </div>
+    <form>
+        <div class="form-group col-md-12">
+            <input #stockSym type="text"  class="form-control" placeholder="Enter Stock Symbol and press return!">
+            <button type="button" (click)="addToChart(stockSym.value); stockSym.value=''">Click me!</button>
+        </div>
+    </form>
+    <div class="row">
+        <div class="col-xs-12">
+            <div *ngIf="chartMessage" class="alert alert-warning chartMes">
+                {{chartMessage}}
+            </div>
+            <div *ngFor="let stock of recentStock" class="col-sm-4">
+                <div class="recentStockList">
+                    <h2 class="text-center text-info">
+                        {{stock}}
+                        <div (click)="removeFromChart(stock)" class="text-danger" id="delete">X</div>
+                    </h2>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
