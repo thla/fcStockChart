@@ -9,7 +9,7 @@ export class FetchDataComponent {
     public forecasts: WeatherForecast[];
 
     constructor(http: Http) {
-        http.get('/api/StockData/YahooData/?stock=AAPL&period=d').subscribe(result => {
+        http.get('/api/StockData/QuandlData/?stock=AAPL&period=d').subscribe(result => {
             this.forecasts = result.json() as WeatherForecast[];
         });
     }

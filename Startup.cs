@@ -20,7 +20,7 @@ namespace fcStockChart
 {
     public class Startup
     {
-        public static HashSet<String> StockData = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "GOOG" };
+        public static Dictionary<string, string> StockData = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { { "GOOG", "Alphabet Inc (GOOG) Prices, Dividends, Splits and Trading Volume" } };
         private static ConcurrentDictionary<string, WebSocket> _sockets = new ConcurrentDictionary<string, WebSocket>();
 
         public Startup(IHostingEnvironment env)
@@ -123,7 +123,10 @@ namespace fcStockChart
                 if (data[0].ToString() == "add")
                 {
                     var stocks = JsonConvert.DeserializeObject<string[]>(data[1].ToString());
-                    StockData.UnionWith(stocks);
+                    foreach (var stock in stocks)
+                    {
+                        if (!StockData.Keys.Contains(stock)) StockData.Add(stock, "");
+                    }
                 }
                 var resp = System.Text.Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(StockData));
 

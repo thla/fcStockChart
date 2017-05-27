@@ -7,21 +7,18 @@ import { Observable } from 'rxjs/Rx';
 
 @Component({
     selector: 'home',
-    styles: [`
-      chart {
-        display: block; 
-      }
-    `],
-    templateUrl: './home.component.html'
+    templateUrl: './home.component.html',
+    styleUrls: ['./home.component.css']
 })
 
-
 export class HomeComponent {
+
     constructor(private http: Http) {
         this.series = [];
         var scheme = document.location.protocol == "https:" ? "wss" : "ws";
         var port = document.location.port ? (":" + document.location.port) : "";
-        this.connectionUrl = scheme + "://" + document.location.hostname + port + "/ws" ;
+        this.connectionUrl = scheme + "://" + document.location.hostname + port + "/ws";
+        this.stockList = new Map<string, string>(); 
     }
 
     
@@ -38,12 +35,19 @@ export class HomeComponent {
         });
     }
 
+    private objToStrMap(obj): Map<string, string> {
+        let strMap = new Map<string, string>(); 
+        for (let k of Object.keys(obj)) {
+            strMap.set(k, obj[k]);
+        }
+        return strMap;
+    }
+
     private syncStockList() 
     {
-        this.getStockList().then(stockList => {
-            this.stockList = stockList;
-            var seriesnames = this.series.map(function (a) { return a.name; }) || [];
-            this.getStockData(stockList.filter(function (i) { return seriesnames.indexOf(i) < 0; }));
+        this.getStockList().then(stockList  => {
+            this.stockList = this.objToStrMap(stockList);
+            this.getStockData(Array.from(this.stockList.keys()));
         })
     }
 
@@ -70,6 +74,7 @@ export class HomeComponent {
     private createChart() {
 
         this.options = {
+            colors: ['#50B432', '#ED561B', '#DDDF00', '#24CBE5', '#64E572', '#FF9655', '#FFF263', '#6AF9C4'],
 
             title: { text: 'Stocks' },
 
@@ -110,26 +115,25 @@ export class HomeComponent {
     private getStockData(stockList: string[]) {
 
         let i: number;
-        let offset = this.series.length;
         let responses: Observable<Response>[] = [];
         for (i = 0; i < stockList.length; i++) {
-            let url = `/api/StockData/YahooData?stock=${stockList[i]}`;
-            this.series[offset + i] = {
+            let url = `/api/StockData/QuandlData?stock=${stockList[i]}`;
+            this.series[i] = {
                 name: stockList[i],
                 data: []
             };
 
             responses.push(this.http.get(url).map((res: Response) => res.json().reverse().map(info => {
                 return [
-                    (new Date(info[0])).getTime(),
-                    parseFloat(info[1])
+                   (new Date(info[0])).getTime(),
+                   parseFloat(info[1])
                 ];
             })));
         };
 
         Observable.forkJoin(responses).subscribe(res => {
             for (i = 0; i < res.length; i++) {
-                this.series[offset + i].data = res[i];
+                this.series[i].data = res[i];
             }
             this.createChart()
         });
@@ -143,8 +147,8 @@ export class HomeComponent {
             {
                 this.chartMessage = "";
                 stockSym = stockSym.toUpperCase();
-                if (this.stockList.indexOf(stockSym) === -1) this.stockList.push(stockSym); 
-                this.socket.send(JSON.stringify([this.stockList]));
+                if (!this.stockList.get(stockSym)) this.stockList.set(stockSym, ""); 
+                this.socket.send(JSON.stringify([this.stockList.keys]));
             }
             else
             {
@@ -153,11 +157,23 @@ export class HomeComponent {
         }); 
     }
 
+    deleteFromChart(stockSym: string) {
+        console.log("deleteFromChart " + stockSym);
+        if (this.stockList.has(stockSym)) {
+            this.stockList.delete(stockSym);
+           this.socket.send(JSON.stringify([this.stockList.keys]));
+        }
+    }
+
+    keys(): Array<string> {
+        return Array.from(this.stockList.keys());
+    }
+
     options: Object;
     series: {name : string, data : any}[];
     chartMessage: string = '';
     connectionUrl: string;
     socket: WebSocket;
-    stockList: string[];
+    stockList: Map<string, string>; 
 }
 

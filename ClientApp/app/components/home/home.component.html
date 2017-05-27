@@ -1,4 +1,5 @@
 
+
 <div class="container">
     <div class="row">
         <chart type="StockChart" [options]="options" style="height:40em"></chart>
@@ -9,19 +10,29 @@
             <button type="button" (click)="addToChart(stockSym.value); stockSym.value=''">Click me!</button>
         </div>
     </form>
+
     <div class="row">
-        <div class="col-xs-12">
-            <div *ngIf="chartMessage" class="alert alert-warning chartMes">
-                {{chartMessage}}
+        <div class="col-md-12 stocks-container">
+
+            <div class="col-md-4 col-sm-6 stock-block" *ngFor="let key of keys()">
+                <h3>{{key}} <button type="button" class="close" (click)="deleteFromChart(entry.key)">&times;</button></h3>
+                <span class="name">{{ stockList.get(key) }}</span>
             </div>
-            <div *ngFor="let stock of recentStock" class="col-sm-4">
-                <div class="recentStockList">
-                    <h2 class="text-center text-info">
-                        {{stock}}
-                        <div (click)="removeFromChart(stock)" class="text-danger" id="delete">X</div>
-                    </h2>
-                </div>
+
+            <div class="col-md-4 col-sm-6 stock-block stock-new">
+                <label>Syncs in realtime across clients</label>
+                <form novalidate>
+                    <div class="input-group">
+                        <input #stockSym type="text" class="form-control" placeholder="Enter stock code" >
+                        <span class="input-group-btn">
+                            <button class="btn btn-success" type="button" (click)="addToChart(stockSym.value); stockSym.value=''">Add</button>
+                        </span>
+                    </div>
+                </form>
+
+                <div class="error">{{chartMessage}}</div>
             </div>
+
         </div>
     </div>
 </div>

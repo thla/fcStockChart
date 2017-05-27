@@ -5,13 +5,14 @@ using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
+using Newtonsoft.Json;
 
 namespace fcStockChart.Controllers
 {
     [Route("api/[controller]")]
     public class StockDataController : Controller
     {
-        private static ConcurrentDictionary<string, Tuple<DateTime, string[][]>> stockCache = new ConcurrentDictionary<string, Tuple<DateTime, string[][]>>();
+        private static ConcurrentDictionary<string, Tuple<DateTime, object>> stockCache = new ConcurrentDictionary<string, Tuple<DateTime, object>>();
 
         [HttpGet("AddStock")]
         public JsonResult AddStock([FromQuery]string stock)
@@ -19,14 +20,14 @@ namespace fcStockChart.Controllers
             if (!String.IsNullOrWhiteSpace(stock))
             {
                 stock = stock.ToUpper();
-                var res = QueryStockData(stock);
+                var res = QueryStockData(stock, true);
                 if (res == null)
                 {
                     return new JsonResult(new { msg = "nok" });
                 }
                 else
                 {
-                    Startup.StockData.Add(stock);
+                    Startup.StockData[stock] = "";
                     return new JsonResult(new { msg = "ok" });
                 }
             }
@@ -37,16 +38,16 @@ namespace fcStockChart.Controllers
 
 
         [HttpGet("StockList")]
-        public IActionResult StockList()
+        public JsonResult StockList()
         {
-            return Ok(Startup.StockData.ToArray());
+            return Json(Startup.StockData);
         }
 
         //[HttpGet("[action]/{element}/{period}")]
-        [HttpGet("YahooData")]
-        public IActionResult YahooData([FromQuery]string stock)
+        [HttpGet("QuandlData")]
+        public IActionResult QuandlData([FromQuery]string stock)
         {
-            var res = QueryStockData(stock);
+            var res = QueryStockData(stock, false);
             if (res == null)
                 return NotFound(stock);
             else
@@ -54,7 +55,7 @@ namespace fcStockChart.Controllers
         }
 
 
-        private string[][] QueryStockData(string stock)
+        private object QueryStockData(string stock, bool add)
         {
             if (stockCache.ContainsKey(stock))
             {
@@ -66,33 +67,28 @@ namespace fcStockChart.Controllers
 
 
             //Console.WriteLine("Please enter date information. If you leave the fields in blank, the default range is 01/01/2000 - 01/01/2014");
-            DateTime startDate = DateTime.Now.AddYears(-1);
+            DateTime endDate = DateTime.Now;
+            DateTime startDate = endDate.AddYears(-1);
+            var apikey = Environment.GetEnvironmentVariable("QUANDL_API_KEY");
 
-            var startDay = startDate.Day;
-            var startMonth = startDate.Month - 1;
-            var startYear = startDate.Year;
-            var finishDay = DateTime.Now.Day;
-            //Console.WriteLine("Of what month? (00 = January, 11 = December)");
-            var finishMonth = DateTime.Now.Month - 1;
-            var finishYear = DateTime.Now.Year;
-
-            var urlPrototype = @"http://ichart.finance.yahoo.com/table.csv?s={0}&a={1:00}&b={2:00}&c={3}&d={4:00}&e={5:00}&f={6}&g={7}&ignore=.csv";
-            var url = string.Format(urlPrototype, stock, startMonth, startDay, startYear, finishMonth, finishDay, finishYear, "d");
+            var urlPrototype = @"https://www.quandl.com/api/v3/datasets/WIKI/{0}.json?api_key={1}&start_date={2}&end_date={3}&column_index=1";
+            var url = string.Format(urlPrototype, stock, apikey, startDate.ToString("yyyy-MM-dd"), endDate.ToString("yyyy-MM-dd"));
 
             using (HttpClient client = new HttpClient())
             {
                 HttpResponseMessage response = client.GetAsync(url).Result;
-                string data = response.Content.ReadAsStringAsync().Result;
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var rows = Regex.Split(data, "\r\n|\r|\n").Skip(1).Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Split(',')).ToArray();
-                    stockCache.TryAdd(stock, Tuple.Create<DateTime, string[][]>(DateTime.Now.Date, rows));
-                    return rows;
+                    dynamic obj = JsonConvert.DeserializeObject<dynamic>(response.Content.ReadAsStringAsync().Result);
+                    stockCache.TryAdd(stock, Tuple.Create<DateTime, object>(DateTime.Now.Date, obj.dataset.data));
+                    if (add) Startup.StockData[stock] = obj.dataset.name;
+                    return obj.dataset.data;
                 }
             }
             return null;
 
         }
     }
+
 }
