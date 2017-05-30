@@ -30,8 +30,9 @@ export class HomeComponent {
             alert("Websocket connection error!");
         };
         this.socket.onmessage = (event => {
-            console.log(event.data);
-            this.syncStockList();
+            console.log("event " + event.data);
+            this.stockList = this.objToStrMap(JSON.parse(event.data));
+            this.getStockData(this.keys());
         });
     }
 
@@ -46,8 +47,9 @@ export class HomeComponent {
     private syncStockList() 
     {
         this.getStockList().then(stockList  => {
+            console.log("stockList " + stockList);
             this.stockList = this.objToStrMap(stockList);
-            this.getStockData(Array.from(this.stockList.keys()));
+            this.getStockData(this.keys());
         })
     }
 
@@ -116,6 +118,7 @@ export class HomeComponent {
 
         let i: number;
         let responses: Observable<Response>[] = [];
+        this.series =  [];
         for (i = 0; i < stockList.length; i++) {
             let url = `/api/StockData/QuandlData?stock=${stockList[i]}`;
             this.series[i] = {
@@ -148,7 +151,7 @@ export class HomeComponent {
                 this.chartMessage = "";
                 stockSym = stockSym.toUpperCase();
                 if (!this.stockList.get(stockSym)) this.stockList.set(stockSym, ""); 
-                this.socket.send(JSON.stringify([this.stockList.keys]));
+                this.socket.send(JSON.stringify(this.keys()));
             }
             else
             {
@@ -160,8 +163,10 @@ export class HomeComponent {
     deleteFromChart(stockSym: string) {
         console.log("deleteFromChart " + stockSym);
         if (this.stockList.has(stockSym)) {
-            this.stockList.delete(stockSym);
-           this.socket.send(JSON.stringify([this.stockList.keys]));
+            if (this.stockList.delete(stockSym))
+            {
+                this.socket.send(JSON.stringify(this.keys()));
+            }
         }
     }
 

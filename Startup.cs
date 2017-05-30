@@ -115,20 +115,16 @@ namespace fcStockChart
         #region Echo
         private async Task Echo(HttpContext context, WebSocket webSocket)
         {
+            try
+            {
             var buffer = new byte[1024 * 4];
             WebSocketReceiveResult result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
             while (!result.CloseStatus.HasValue)
             {
-                var data = JsonConvert.DeserializeObject<object[]>(Encoding.UTF8.GetString(buffer, 0, result.Count));
-                if (data[0].ToString() == "add")
-                {
-                    var stocks = JsonConvert.DeserializeObject<string[]>(data[1].ToString());
-                    foreach (var stock in stocks)
-                    {
-                        if (!StockData.Keys.Contains(stock)) StockData.Add(stock, "");
-                    }
-                }
-                var resp = System.Text.Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(StockData));
+                var stocks = JsonConvert.DeserializeObject<string[]>(Encoding.UTF8.GetString(buffer,0,result.Count));
+                var filteredStocks = StockData.Where(p => stocks.Contains(p.Key))
+                                            .ToDictionary(p => p.Key, p => p.Value);
+                var resp = System.Text.Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(filteredStocks));
 
                 foreach (var socket in _sockets)
                 {
@@ -143,6 +139,12 @@ namespace fcStockChart
                 result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
             }
             await webSocket.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
+            }
+            catch (System.Exception ex)
+            {
+                
+                throw;
+            }
         }
         #endregion
     }

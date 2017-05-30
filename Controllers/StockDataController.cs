@@ -27,7 +27,6 @@ namespace fcStockChart.Controllers
                 }
                 else
                 {
-                    Startup.StockData[stock] = "";
                     return new JsonResult(new { msg = "ok" });
                 }
             }

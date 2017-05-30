@@ -4,18 +4,12 @@
     <div class="row">
         <chart type="StockChart" [options]="options" style="height:40em"></chart>
     </div>
-    <form>
-        <div class="form-group col-md-12">
-            <input #stockSym type="text"  class="form-control" placeholder="Enter Stock Symbol and press return!">
-            <button type="button" (click)="addToChart(stockSym.value); stockSym.value=''">Click me!</button>
-        </div>
-    </form>
 
     <div class="row">
         <div class="col-md-12 stocks-container">
 
             <div class="col-md-4 col-sm-6 stock-block" *ngFor="let key of keys()">
-                <h3>{{key}} <button type="button" class="close" (click)="deleteFromChart(entry.key)">&times;</button></h3>
+                <h3>{{key}} <button type="button" class="close" (click)="deleteFromChart(key);">&times;</button></h3>
                 <span class="name">{{ stockList.get(key) }}</span>
             </div>
 
