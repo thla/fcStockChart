@@ -12,7 +12,12 @@ namespace fcStockChart.Controllers
     [Route("api/[controller]")]
     public class StockDataController : Controller
     {
-        private static ConcurrentDictionary<string, Tuple<DateTime, object>> stockCache = new ConcurrentDictionary<string, Tuple<DateTime, object>>();
+        public StockDataController()
+        {
+            QueryStockData("GOOG", true);
+        }
+
+        private static ConcurrentDictionary<string, Tuple<DateTime, string, object>> stockCache = new ConcurrentDictionary<string, Tuple<DateTime, string, object>>();
 
         [HttpGet("AddStock")]
         public JsonResult AddStock([FromQuery]string stock)
@@ -39,7 +44,9 @@ namespace fcStockChart.Controllers
         [HttpGet("StockList")]
         public JsonResult StockList()
         {
-            return Json(Startup.StockData);
+            var filteredStocks = stockCache.Where(p => Startup.StockData.Contains(p.Key))
+                                            .ToDictionary(p => p.Key, p => p.Value.Item2);
+            return Json(filteredStocks);
         }
 
         //[HttpGet("[action]/{element}/{period}")]
@@ -60,7 +67,7 @@ namespace fcStockChart.Controllers
             {
                 if (stockCache[stock].Item1 == DateTime.Now.Date)
                 {
-                    return stockCache[stock].Item2;
+                    return stockCache[stock].Item3;
                 }
             }
 
@@ -80,8 +87,7 @@ namespace fcStockChart.Controllers
                 if (response.IsSuccessStatusCode)
                 {
                     dynamic obj = JsonConvert.DeserializeObject<dynamic>(response.Content.ReadAsStringAsync().Result);
-                    stockCache.TryAdd(stock, Tuple.Create<DateTime, object>(DateTime.Now.Date, obj.dataset.data));
-                    if (add) Startup.StockData[stock] = obj.dataset.name;
+                    stockCache.TryAdd(stock, Tuple.Create<DateTime, string, object>(DateTime.Now.Date, obj.dataset.name.ToString(),obj.dataset.data));
                     return obj.dataset.data;
                 }
             }

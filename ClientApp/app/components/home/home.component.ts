@@ -18,7 +18,7 @@ export class HomeComponent {
         var scheme = document.location.protocol == "https:" ? "wss" : "ws";
         var port = document.location.port ? (":" + document.location.port) : "";
         this.connectionUrl = scheme + "://" + document.location.hostname + port + "/ws";
-        this.stockList = new Map<string, string>(); 
+        this.stockList = new Set<string>(); 
     }
 
     
@@ -31,7 +31,7 @@ export class HomeComponent {
         };
         this.socket.onmessage = (event => {
             console.log("event " + event.data);
-            this.stockList = this.objToStrMap(JSON.parse(event.data));
+            this.stockList = JSON.parse(event.data);
             this.getStockData(this.keys());
         });
     }
@@ -48,7 +48,7 @@ export class HomeComponent {
     {
         this.getStockList().then(stockList  => {
             console.log("stockList " + stockList);
-            this.stockList = this.objToStrMap(stockList);
+            this.stockList = stockList;
             this.getStockData(this.keys());
         })
     }
@@ -150,7 +150,7 @@ export class HomeComponent {
             {
                 this.chartMessage = "";
                 stockSym = stockSym.toUpperCase();
-                if (!this.stockList.get(stockSym)) this.stockList.set(stockSym, ""); 
+                if (!this.stockList.has(stockSym)) this.stockList.add(stockSym); 
                 this.socket.send(JSON.stringify(this.keys()));
             }
             else
@@ -179,6 +179,6 @@ export class HomeComponent {
     chartMessage: string = '';
     connectionUrl: string;
     socket: WebSocket;
-    stockList: Map<string, string>; 
+    stockList: Set<string>; 
 }
 

@@ -20,7 +20,7 @@ namespace fcStockChart
 {
     public class Startup
     {
-        public static Dictionary<string, string> StockData = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { { "GOOG", "Alphabet Inc (GOOG) Prices, Dividends, Splits and Trading Volume" } };
+        public static IList<string> StockData = new List<string> { "GOOG" };
         private static ConcurrentDictionary<string, WebSocket> _sockets = new ConcurrentDictionary<string, WebSocket>();
 
         public Startup(IHostingEnvironment env)
@@ -122,9 +122,8 @@ namespace fcStockChart
             while (!result.CloseStatus.HasValue)
             {
                 var stocks = JsonConvert.DeserializeObject<string[]>(Encoding.UTF8.GetString(buffer,0,result.Count));
-                var filteredStocks = StockData.Where(p => stocks.Contains(p.Key))
-                                            .ToDictionary(p => p.Key, p => p.Value);
-                var resp = System.Text.Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(filteredStocks));
+                StockData = stocks;
+                var resp = System.Text.Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(stocks));
 
                 foreach (var socket in _sockets)
                 {
@@ -141,8 +140,7 @@ namespace fcStockChart
             await webSocket.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
             }
             catch (System.Exception ex)
-            {
-                
+            {                
                 throw;
             }
         }
