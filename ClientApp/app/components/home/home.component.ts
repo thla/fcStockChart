@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
 import { Injectable } from '@angular/core';
 import { Http, Response } from '@angular/http';
 
@@ -11,14 +11,17 @@ import { Observable } from 'rxjs/Rx';
     styleUrls: ['./home.component.css']
 })
 
+
 export class HomeComponent {
+
+    @ViewChild('stockSym') vc;
 
     constructor(private http: Http) {
         this.series = [];
         var scheme = document.location.protocol == "https:" ? "wss" : "ws";
         var port = document.location.port ? (":" + document.location.port) : "";
         this.connectionUrl = scheme + "://" + document.location.hostname + port + "/ws";
-        this.stockList = new Set<string>(); 
+        this.stockList = new Map<string,string>(); 
     }
 
     
@@ -26,14 +29,23 @@ export class HomeComponent {
         this.syncStockList();
 
         this.socket = new WebSocket(this.connectionUrl);
+        this.socket.onopen = function (event) {
+            console.log("socket.onopen")
+        };
+        this.socket.onclose = function (event) {
+            console.log("socket.onopen")
+        };        
         this.socket.onerror = function (event) {
             alert("Websocket connection error!");
         };
         this.socket.onmessage = (event => {
-            console.log("event " + event.data);
-            this.stockList = JSON.parse(event.data);
-            this.getStockData(this.keys());
+            console.log("event.data: " + event.data)
+            this.syncStockList();
         });
+    }
+
+    ngAfterViewInit() {
+        this.vc.nativeElement.focus();
     }
 
     private objToStrMap(obj): Map<string, string> {
@@ -42,13 +54,13 @@ export class HomeComponent {
             strMap.set(k, obj[k]);
         }
         return strMap;
-    }
+    }    
 
     private syncStockList() 
     {
-        this.getStockList().then(stockList  => {
-            console.log("stockList " + stockList);
-            this.stockList = stockList;
+        this.getStockList().then(stocks  => {
+            console.log("stocks " + stocks);
+            this.stockList = this.objToStrMap(stocks);
             this.getStockData(this.keys());
         })
     }
@@ -120,7 +132,7 @@ export class HomeComponent {
         let responses: Observable<Response>[] = [];
         this.series =  [];
         for (i = 0; i < stockList.length; i++) {
-            let url = `/api/StockData/QuandlData?stock=${stockList[i]}`;
+            let url = `/api/StockData/QueryStockData?stock=${stockList[i]}`;
             this.series[i] = {
                 name: stockList[i],
                 data: []
@@ -140,6 +152,8 @@ export class HomeComponent {
             }
             this.createChart()
         });
+
+        if (this.series.length === 0) this.createChart();
     }
 
 
@@ -150,7 +164,7 @@ export class HomeComponent {
             {
                 this.chartMessage = "";
                 stockSym = stockSym.toUpperCase();
-                if (!this.stockList.has(stockSym)) this.stockList.add(stockSym); 
+                if (!this.stockList.has(stockSym)) this.stockList.set(stockSym, ""); 
                 this.socket.send(JSON.stringify(this.keys()));
             }
             else
@@ -174,11 +188,12 @@ export class HomeComponent {
         return Array.from(this.stockList.keys());
     }
 
+
     options: Object;
     series: {name : string, data : any}[];
     chartMessage: string = '';
     connectionUrl: string;
     socket: WebSocket;
-    stockList: Set<string>; 
+    stockList: Map<string, string>;
 }
 

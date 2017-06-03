@@ -14,7 +14,7 @@ namespace fcStockChart.Controllers
     {
         public StockDataController()
         {
-            QueryStockData("GOOG", true);
+            QueryStockData("GOOG");
         }
 
         private static ConcurrentDictionary<string, Tuple<DateTime, string, object>> stockCache = new ConcurrentDictionary<string, Tuple<DateTime, string, object>>();
@@ -25,8 +25,8 @@ namespace fcStockChart.Controllers
             if (!String.IsNullOrWhiteSpace(stock))
             {
                 stock = stock.ToUpper();
-                var res = QueryStockData(stock, true);
-                if (res == null)
+                var res = QueryStockData(stock);
+                if (res.Value == null)
                 {
                     return new JsonResult(new { msg = "nok" });
                 }
@@ -44,30 +44,21 @@ namespace fcStockChart.Controllers
         [HttpGet("StockList")]
         public JsonResult StockList()
         {
-            var filteredStocks = stockCache.Where(p => Startup.StockData.Contains(p.Key))
-                                            .ToDictionary(p => p.Key, p => p.Value.Item2);
-            return Json(filteredStocks);
-        }
-
-        //[HttpGet("[action]/{element}/{period}")]
-        [HttpGet("QuandlData")]
-        public IActionResult QuandlData([FromQuery]string stock)
-        {
-            var res = QueryStockData(stock, false);
-            if (res == null)
-                return NotFound(stock);
-            else
-                return Ok(res);
+            var res = stockCache.Where(p => Startup.StockData.Contains(p.Key))
+                .ToDictionary(p => p.Key, p => p.Value.Item2);
+            return Json(res);
         }
 
 
-        private object QueryStockData(string stock, bool add)
+         //[HttpGet("[action]/{element}/{period}")]
+        [HttpGet("QueryStockData")]
+        public JsonResult QueryStockData([FromQuery]string stock)
         {
             if (stockCache.ContainsKey(stock))
             {
                 if (stockCache[stock].Item1 == DateTime.Now.Date)
                 {
-                    return stockCache[stock].Item3;
+                    return Json(stockCache[stock].Item3);
                 }
             }
 
@@ -88,10 +79,10 @@ namespace fcStockChart.Controllers
                 {
                     dynamic obj = JsonConvert.DeserializeObject<dynamic>(response.Content.ReadAsStringAsync().Result);
                     stockCache.TryAdd(stock, Tuple.Create<DateTime, string, object>(DateTime.Now.Date, obj.dataset.name.ToString(),obj.dataset.data));
-                    return obj.dataset.data;
+                    return Json(obj.dataset.data);
                 }
             }
-            return null;
+            return Json(null);
 
         }
     }
